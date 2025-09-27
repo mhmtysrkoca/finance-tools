@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bileşik Getiri Hesaplayıcı</title>
+  <meta name="description" content="Bileşik getiri hesaplayıcısı — anapara, düzenli katkı, yıllık faiz ve vade girip yıllık bakiye çizelgesi ve grafik alabilirsiniz." />
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{--bg:#0f172a;--card:#0b1220;--accent:#7c3aed;--muted:#94a3b8;--glass:rgba(255,255,255,0.03)}
+    *{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    body{margin:0;background:linear-gradient(180deg,#071029 0%, #0b1220 100%);color:#e6eef8;min-height:100vh;padding:28px}
+    .container{max-width:980px;margin:0 auto}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .grid{display:grid;grid-template-columns:1fr 420px;gap:18px}
+    .card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type=number],select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:inherit}
+    .row{display:flex;gap:8px}
+    .row>div{flex:1}
+    button{background:var(--accent);border:none;color:white;padding:10px 12px;border-radius:10px;cursor:pointer}
+    .small{font-size:13px;color:var(--muted)}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);text-align:right;font-size:13px}
+    th{text-align:left;color:var(--muted)}
+    .result{font-weight:700;font-size:18px}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect x="2" y="2" width="20" height="20" rx="6" fill="#0b1220" stroke="#7c3aed" stroke-width="1.2" />
+        <path d="M6 14c1.5-3 4.5-4 7-4s5.5 1 6 4" stroke="#7c3aed" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <div>
+        <h1>Bileşik Getiri Hesaplayıcı</h1>
+        <div class="small">Anapara, düzenli katkı, faiz ve vade girin — yıllık bakiye tablosu ve grafik üretir.</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card" aria-labelledby="calc-title">
+        <h2 id="calc-title">Girdi</h2>
+        <div style="margin-top:12px;">
+          <label for="principal">Başlangıç sermayesi (€)</label>
+          <input id="principal" type="number" min="0" step="0.01" value="10000" />
+        </div>
+
+        <div style="margin-top:12px;">
+          <label for="contribution">Dönemsel katkı (örn. aylık) (€)</label>
+          <input id="contribution" type="number" min="0" step="0.01" value="200" />
+        </div>
+
+        <div class="row" style="margin-top:12px;">
+          <div>
+            <label for="rate">Yıllık faiz oranı (%)</label>
+            <input id="rate" type="number" min="0" step="0.01" value="8" />
+          </div>
+          <div>
+            <label for="years">Yıl (vade)</label>
+            <input id="years" type="number" min="1" step="1" value="10" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px;">
+          <div>
+            <label for="freq">Bileşikleşme sıklığı</label>
+            <select id="freq">
+              <option value="12">Aylık</option>
+              <option value="4">3 Ayda 1</option>
+              <option value="1">Yıllık</option>
+              <option value="365">Günlük</option>
+            </select>
+          </div>
+          <div>
+            <label for="contributionFreq">Katkı sıklığı (aynı birim)</label>
+            <select id="contributionFreq">
+              <option value="12">Aylık</option>
+              <option value="4">3 Ayda 1</option>
+              <option value="1">Yıllık</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;display:flex;gap:8px;align-items:center">
+          <button id="compute">Hesapla</button>
+          <button id="download" style="background:#0ea5a4">CSV indir</button>
+          <div style="flex:1;text-align:right;color:var(--muted);font-size:13px">Son hesaplama: <span id="lastRun">—</span></div>
+        </div>
+
+        <hr style="margin:14px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)" />
+
+        <div>
+          <div class="small">Özet</div>
+          <div style="display:flex;gap:12px;margin-top:8px;align-items:baseline">
+            <div>
+              <div class="small">Toplam katkı</div>
+              <div id="totalContrib" class="result">€ 0.00</div>
+            </div>
+            <div>
+              <div class="small">Toplam bakiye</div>
+              <div id="finalAmount" class="result">€ 0.00</div>
+            </div>
+            <div>
+              <div class="small">Kazanılan faiz</div>
+              <div id="earned" class="result">€ 0.00</div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <aside>
+        <div class="card">
+          <canvas id="chart" width="400" height="300" aria-label="Bakiye grafiği" role="img"></canvas>
+          <div style="margin-top:10px;max-height:240px;overflow:auto">
+            <table id="table">
+              <thead><tr><th>Yıl</th><th>Bakiye</th><th>Toplam Katkı</th><th>Kazanç</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    // Utility: format euro
+    const fmt = n => n.toLocaleString('tr-TR',{style:'currency',currency:'EUR',maximumFractionDigits:2});
+
+    function computeSchedule(principal, contribution, ratePercent, years, compPerYear, contribPerYear){
+      const r = ratePercent/100;
+      const totalPeriods = years * compPerYear;
+      const contribPerPeriod = contribution * (contribPerYear/compPerYear);
+      let balance = principal;
+      const yearly = [];
+      let totalContrib = 0;
+
+      for(let year=1; year<=years; year++){
+        for(let p=0;p<compPerYear;p++){
+          // interest per period
+          balance *= (1 + r/compPerYear);
+          // if contributions are periodic within same compounding unit, add
+          if(contribPerPeriod>0){ balance += contribPerPeriod; totalContrib += contribPerPeriod; }
+        }
+        const earned = balance - principal - totalContrib;
+        yearly.push({year, balance, totalContrib, earned});
+      }
+      return {yearly,totalContrib,finalAmount:balance};
+    }
+
+    const ctx = document.getElementById('chart').getContext('2d');
+    let chart = new Chart(ctx, {type:'line',data:{labels:[],datasets:[{label:'Bakiye',data:[],fill:true, tension:0.25}]}, options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:false}}}});
+
+    document.getElementById('compute').addEventListener('click', ()=>{
+      const principal = parseFloat(document.getElementById('principal').value) || 0;
+      const contribution = parseFloat(document.getElementById('contribution').value) || 0;
+      const rate = parseFloat(document.getElementById('rate').value) || 0;
+      const years = parseInt(document.getElementById('years').value) || 1;
+      const freq = parseInt(document.getElementById('freq').value);
+      const contribFreq = parseInt(document.getElementById('contributionFreq').value);
+
+      const res = computeSchedule(principal, contribution, rate, years, freq, contribFreq);
+
+      document.getElementById('totalContrib').textContent = fmt(res.totalContrib);
+      document.getElementById('finalAmount').textContent = fmt(res.finalAmount);
+      document.getElementById('earned').textContent = fmt(res.finalAmount - (principal + res.totalContrib));
+      document.getElementById('lastRun').textContent = new Date().toLocaleString('tr-TR');
+
+      // Table
+      const tbody = document.querySelector('#table tbody'); tbody.innerHTML = '';
+      const labels = [];
+      const data = [];
+      res.yearly.forEach(row=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td style="text-align:left">${row.year}</td><td>${fmt(row.balance)}</td><td>${fmt(row.totalContrib)}</td><td>${fmt(row.earned)}</td>`;
+        tbody.appendChild(tr);
+        labels.push('Yıl ' + row.year);
+        data.push(Number(row.balance.toFixed(2)));
+      });
+
+      chart.data.labels = labels; chart.data.datasets[0].data = data; chart.update();
+
+      // prepare CSV
+      const csvRows = [['Yıl','Bakiye','Toplam Katkı','Kazanç']];
+      res.yearly.forEach(r=>csvRows.push([r.year, r.balance.toFixed(2), r.totalContrib.toFixed(2), r.earned.toFixed(2)]));
+      window._compoundCSV = csvRows.map(r=>r.join(',')).join('\n');
+    });
+
+    document.getElementById('download').addEventListener('click', ()=>{
+      if(!window._compoundCSV){ alert('Önce Hesapla butonuna basın.'); return; }
+      const blob = new Blob([window._compoundCSV],{type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'compound_schedule.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // quick demo run
+    document.getElementById('compute').click();
+  </script>
+</body>
+</html>
